@@ -48,6 +48,7 @@ All yields happen in ONE generator that Open WebUI follows from start to finish.
 - Open WebUI
 - Anthropic API key
 - Desktop Commander MCP server running via MCPO (optional, for tool execution)
+  https://github.com/wonderwhy-er/DesktopCommanderMCP
 
 ## Installation
 
@@ -84,8 +85,8 @@ Tool name mapping: `tool_read_file_post` maps to endpoint `/read_file`
 ## Credits
 
 - Original pipe by Balaxxe
-- Agentic loop, caching, and MCP integration by Radar105 & Aurora
-
+- Agentic loop, caching, and MCP integration by Radar105
+- https://github.com/wonderwhy-er/DesktopCommanderMCP by wonderwhy-er 
 ## License
 
 MIT
