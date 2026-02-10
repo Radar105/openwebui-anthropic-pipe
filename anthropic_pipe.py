@@ -511,6 +511,9 @@ class Pipe:
         model_name = body["model"].split("/")[-1]
         msg_id = None
         tool_call_index = -1
+        has_tool_use = False
+        has_tools_in_request = "tools" in payload
+        text_buffer = []  # Buffer text when tools present — discard if tool_use blocks appear
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -561,8 +564,9 @@ class Pipe:
 
                                 elif block_type == "tool_use":
                                     is_thinking = False
+                                    has_tool_use = True
+                                    text_buffer.clear()
                                     tool_call_index += 1
-                                    # Yield initial tool_call chunk with id and name
                                     yield {
                                         "id": f"chatcmpl-{msg_id}",
                                         "object": "chat.completion.chunk",
@@ -592,7 +596,11 @@ class Pipe:
                                     yield delta.get("thinking", "")
 
                                 elif delta_type == "text_delta":
-                                    yield delta.get("text", "")
+                                    text = delta.get("text", "")
+                                    if has_tools_in_request:
+                                        text_buffer.append(text)
+                                    else:
+                                        yield text
 
                                 elif delta_type == "input_json_delta":
                                     partial = delta.get("partial_json", "")
@@ -621,6 +629,9 @@ class Pipe:
                                     is_thinking = False
 
                             elif event_type == "message_stop":
+                                # Flush buffered text only if no tool_use blocks
+                                if not has_tool_use and text_buffer:
+                                    yield "".join(text_buffer)
                                 if __event_emitter__:
                                     await __event_emitter__(
                                         {"type": "status", "data": {"description": "Done", "done": True}}
