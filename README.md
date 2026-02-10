@@ -1,92 +1,82 @@
-# Open WebUI Anthropic Pipe with Agentic Tool Execution
+# Open WebUI Anthropic Pipe
 
-A function pipe for Open WebUI that integrates Anthropic Claude models with full tool execution support via MCP (Model Context Protocol).
+A function pipe for Open WebUI that integrates Anthropic Claude models with native tool execution support. Translates between Anthropic and OpenAI formats so Open WebUI v0.7's middleware handles the full tool loop.
 
 ## Features
 
-- All Claude 3, 3.5, 3.7, 4, 4.5, Opus 4.1, and Opus 4.5 models
-- Streaming responses
+- All Claude 3, 3.5, 3.7, 4, 4.5, Opus 4.1, Opus 4.5, and Opus 4.6 models
+- Streaming responses with OpenAI-format `delta.tool_calls`
 - Image and PDF processing
-- **Prompt caching** - automatic caching of tools and system prompts (90% token savings)
-- **Token-efficient tools** - optimized tool token usage
+- Prompt caching (server-side)
 - Extended thinking (Claude 3.7+)
-- **Agentic tool loop** - tools executed in-pipe, not just returned as JSON
+- 128K output token support (Claude 3.7+)
+- Native Open WebUI v0.7 tool execution — no in-pipe tool handling needed
 
-## Prompt Caching
+## Architecture
 
-The pipe automatically enables prompt caching for significant token savings:
+The pipe is a **pure format translator** between Anthropic's API and OpenAI's streaming format. Open WebUI v0.7 handles everything else:
 
-| Cached Content | Trigger | Savings |
-|----------------|---------|---------|
-| Tools (25+ definitions) | Always when tools present | 90% on repeat calls |
-| System prompt | When >4000 chars | 90% on repeat calls |
+1. Open WebUI sends request to pipe (with tools in body)
+2. Pipe converts OpenAI tools to Anthropic format, calls Anthropic API
+3. Pipe streams response, yielding `delta.tool_calls` dicts for tool_use blocks
+4. Open WebUI middleware parses tool_calls, executes tools via its tool_server connections
+5. Middleware re-calls pipe with tool results as `role=tool` messages
+6. Pipe converts tool results to Anthropic `tool_result` format, calls API again
+7. Repeat until model stops requesting tools
 
-Beta headers automatically added:
-- `prompt-caching-2024-07-31` - enables caching
-- `token-efficient-tools-2025-02-19` - optimizes tool tokens
-
-First call pays +25% (cache write), subsequent calls pay only 10% (cache read).
-
-## Agentic Loop Architecture
-
-Open WebUI is a chat interface, not designed for CLI-style agentic loops. This pipe solves that:
-
-1. Non-streaming first call to get tool_use blocks
-2. Execute tools via Desktop Commander MCP server
-3. Stream the interpretation back to the user
-
-All yields happen in ONE generator that Open WebUI follows from start to finish.
-
-**Status events:**
-- "Thinking..." - waiting for initial response
-- "Executing tools..." - running MCP tools
-- "Interpreting..." - streaming final response
-- "Done" - complete
+The pipe never executes tools itself — it just translates formats.
 
 ## Requirements
 
-- Open WebUI
+- Open WebUI v0.7+
 - Anthropic API key
-- Desktop Commander MCP server running via MCPO (optional, for tool execution)
-  https://github.com/wonderwhy-er/DesktopCommanderMCP
+- Tool server (e.g., MCPO) configured in Open WebUI for tool execution
 
 ## Installation
 
-1. In Open WebUI, go to Admin Panel > Functions
+1. In Open WebUI, go to **Admin Panel > Functions**
 2. Create new function, paste the contents of `anthropic_pipe.py`
-3. Configure the valves:
-   - `ANTHROPIC_API_KEY`: Your Anthropic API key
-   - `DESKTOP_COMMANDER_URL`: URL to your Desktop Commander MCP server (default: `http://localhost:8000/desktop-commander`)
-   - `EXECUTE_TOOLS_IN_PIPE`: Set to `true` to execute tools directly
+3. Set the `ANTHROPIC_API_KEY` valve to your API key
 
 ## Configuration
-
-Key valves:
 
 | Valve | Default | Description |
 |-------|---------|-------------|
 | `ANTHROPIC_API_KEY` | (required) | Your Anthropic API key |
 | `ENABLE_THINKING` | false | Enable extended thinking for Claude 3.7+ |
-| `EXECUTE_TOOLS_IN_PIPE` | true | Execute MCP tools directly in the pipe |
-| `DESKTOP_COMMANDER_URL` | localhost:8000 | URL to Desktop Commander MCP server |
+| `THINKING_BUDGET_TOKENS` | 16000 | Max tokens for thinking (when enabled) |
+| `MAX_OUTPUT_TOKENS` | true | Use maximum output tokens for the model |
+| `ENABLE_TOOL_CHOICE` | true | Pass tools to the Anthropic API |
+| `ENABLE_SYSTEM_PROMPT` | true | Include system prompt in API calls |
 
-## Tool Execution
+## Supported Models
 
-When `EXECUTE_TOOLS_IN_PIPE` is enabled, the pipe:
+All Claude models from Claude 3 through Opus 4.6, including:
 
-1. Converts OpenAI-format tools to Anthropic format
-2. Makes a non-streaming call to detect tool_use
-3. Executes tools via Desktop Commander HTTP API
-4. Sends tool results back to Claude
-5. Streams the interpretation
+- Claude 3 (Opus, Sonnet, Haiku)
+- Claude 3.5 (Sonnet, Haiku)
+- Claude 3.7 Sonnet
+- Claude Sonnet 4
+- Claude Opus 4
+- Claude Sonnet 4.5
+- Claude Opus 4.1
+- Claude Opus 4.5
+- **Claude Opus 4.6** (latest, 128K output with beta header)
 
-Tool name mapping: `tool_read_file_post` maps to endpoint `/read_file`
+## Version History
+
+- **v6.0** — Removed in-pipe tool execution, aligned with Open WebUI v0.7 native tool handling
+- **v5.1** — Added Claude Opus 4.6
+- **v5.0** — Agentic loop for tool execution, Claude Opus 4.5, MCP tool integration
+- **v4.0** — Added Claude 4, Claude 4.5 Sonnet, Opus 4.1
+- **v3.0** — Added Claude 3.7, thinking valves, CoT streaming
 
 ## Credits
 
-- Original pipe by Balaxxe
-- Agentic loop, caching, and MCP integration by Radar105
-- https://github.com/wonderwhy-er/DesktopCommanderMCP by wonderwhy-er 
+- Original pipe by [Balaxxe](https://openwebui.com/f/balaxxe/anthropic_manifold_pipe/)
+- v5.0+ by Radar105
+- [Desktop Commander MCP](https://github.com/wonderwhy-er/DesktopCommanderMCP) by wonderwhy-er (used in v5.0, removed in v6.0)
+
 ## License
 
 MIT
