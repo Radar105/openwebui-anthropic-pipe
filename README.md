@@ -65,6 +65,7 @@ All Claude models from Claude 3 through Opus 4.6, including:
 
 ## Version History
 
+- **v6.0.1** — Buffer and discard tool narration text (Claude emits `<parameter>` XML alongside tool_use blocks)
 - **v6.0** — Removed in-pipe tool execution, aligned with Open WebUI v0.7 native tool handling
 - **v5.1** — Added Claude Opus 4.6
 - **v5.0** — Agentic loop for tool execution, Claude Opus 4.5, MCP tool integration
